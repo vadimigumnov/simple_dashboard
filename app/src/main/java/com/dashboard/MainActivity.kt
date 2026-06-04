@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -21,7 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import android.view.WindowManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,10 +39,13 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import androidx.compose.foundation.shape.CircleShape
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         hideSystemBars()
@@ -92,52 +94,30 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (isActive) activeColor else Color(0xFF2C2C2C))
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = if (isActive) Color.Black else Color(0xFF555555),
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp
-        )
-    }
-}
-
-@Composable
 fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean, isTcActive: Boolean) {
-    val maxRpm = 7000f
+
+    val minRpmLights = 5000f
     val shiftPoint = 6700f
-
-    val rpmProgress = (rpm / maxRpm).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(targetValue = rpmProgress, label = "RpmAnimation")
-
-    val rpmGradient = Brush.horizontalGradient(
-        colors = listOf(Color(0xFF00FF00), Color(0xFFFFB300), Color(0xFFFF0000))
-    )
 
     val isShiftLightActive = rpm >= shiftPoint
     val infiniteTransition = rememberInfiniteTransition(label = "BlinkerTransition")
 
     val blinkAlpha by infiniteTransition.animateFloat(
-        0f,
-        0.8f,
-        infiniteRepeatable(
-            tween(durationMillis = 50, easing = LinearEasing),
-            RepeatMode.Reverse
+        initialValue = 0f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 50, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         ),
         label = "BlinkAlpha"
     )
 
-    val backgroundColor = if (isShiftLightActive) {
-        Color(0xFFFF0000).copy(alpha = blinkAlpha)
-    } else {
-        Color(0xFF0F0F0F)
+    val dotColors = remember {
+        listOf(
+            Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), // 1-5
+            Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), // 6-10
+            Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF)  // 11-15
+        )
     }
 
     Box(
@@ -145,44 +125,50 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
             .fillMaxSize()
             .background(Color(0xFF0F0F0F))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(backgroundColor)
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 48.dp, vertical = 32.dp),
+            verticalArrangement = Arrangement.SpaceEvenly,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(35.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF2C2C2C))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(animatedProgress)
-                            .background(rpmGradient)
-                    )
+                    val rpmPerDot = (shiftPoint - minRpmLights) / 15f
+
+                    repeat(15) { index ->
+                        val dotThreshold = minRpmLights + (index * rpmPerDot)
+                        val isDotActive = rpm >= dotThreshold
+
+                        val finalColor = when {
+                            isShiftLightActive -> Color(0xFF0000FF).copy(alpha = blinkAlpha)
+                            isDotActive -> dotColors[index]
+                            else -> Color(0xFF2C2C2C)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(finalColor)
+                        )
+                    }
                 }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         IndicatorLight(text = "ABS", isActive = isAbsActive, activeColor = Color.Cyan)
                         IndicatorLight(text = "TC", isActive = isTcActive, activeColor = Color.Yellow)
                     }
@@ -197,6 +183,7 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                 }
             }
 
+
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -204,6 +191,7 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Gear
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = gear,
@@ -221,6 +209,7 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                     )
                 }
 
+                // Speed
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${speed.toInt()}",
@@ -243,6 +232,23 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
     }
 }
 
+@Composable
+fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (isActive) activeColor else Color(0xFF2C2C2C))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (isActive) Color.Black else Color(0xFF555555),
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+    }
+}
 suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, Float, String, Boolean, Boolean) -> Unit) {
     withContext(Dispatchers.IO) {
         var socket: DatagramSocket? = null
