@@ -1,5 +1,6 @@
 package com.dashboard
 
+import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.util.Log
@@ -17,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import android.view.WindowManager
@@ -40,6 +40,12 @@ import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import androidx.compose.foundation.shape.CircleShape
+import android.content.Context
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Job
+import java.net.SocketTimeoutException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,14 +61,21 @@ class MainActivity : ComponentActivity() {
         val gearState = mutableStateOf("N")
         val absState = mutableStateOf(false)
         val tcState = mutableStateOf(false)
+        val lapTimeState = mutableIntStateOf(0)
+        val lapTimeBestState = mutableIntStateOf(0)
+        val lapTimeLastState = mutableIntStateOf(0)
+        val targetIp = getSavedIp(this)
 
         lifecycleScope.launch {
-            connectToAssettoCorsa("192.168.1.166") { speed, rpm, gear, isAbs, isTc ->
+            connectToAssettoCorsa(targetIp) { speed, rpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast ->
                 speedState.floatValue = speed
                 rpmState.floatValue = rpm
                 gearState.value = gear
                 absState.value = isAbs
                 tcState.value = isTc
+                lapTimeState.intValue = lapTime
+                lapTimeBestState.intValue = lapTimeBest
+                lapTimeLastState.intValue = lapTimeLast
             }
         }
 
@@ -73,7 +86,10 @@ class MainActivity : ComponentActivity() {
                     rpm = rpmState.floatValue,
                     gear = gearState.value,
                     isAbsActive = absState.value,
-                    isTcActive = tcState.value
+                    isTcActive = tcState.value,
+                    lapTime = lapTimeState.intValue,
+                    lapTimeBest = lapTimeBestState.intValue,
+                    lapTimeLast = lapTimeLastState.intValue
                 )
             }
         }
@@ -93,14 +109,68 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+fun getSavedIp(context: Context): String {
+    val prefs = context.getSharedPreferences("dash_settings", Context.MODE_PRIVATE)
+    return prefs.getString("target_ip", "192.168.1.166") ?: "192.168.1.166"
+}
+
+@SuppressLint("UseKtx")
+fun saveIp(context: Context, ip: String) {
+    val prefs = context.getSharedPreferences("dash_settings", Context.MODE_PRIVATE)
+    prefs.edit().putString("target_ip", ip).apply()
+}
+
 @Composable
-fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean, isTcActive: Boolean) {
+fun SettingsDialog(
+    currentIp: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var ipInput by remember { mutableStateOf(currentIp) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Settings") },
+        text = {
+            Column {
+                Text(text = "IP address:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(
+                    value = ipInput,
+                    onValueChange = { ipInput = it },
+                    placeholder = { Text("192.168.x.x") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(ipInput) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean, isTcActive: Boolean, lapTime: Int, lapTimeBest: Int, lapTimeLast: Int) {
 
     val minRpmLights = 5000f
-    val shiftPoint = 6700f
-
+    val shiftPoint = 6500f
+    val warningPoint = 6900f
+    val localContext = LocalContext.current
+    val isWarningLightActive = rpm >= warningPoint
     val isShiftLightActive = rpm >= shiftPoint
     val infiniteTransition = rememberInfiniteTransition(label = "BlinkerTransition")
+    var showSettings by remember { mutableStateOf(true) }
+    var currentIp by remember { mutableStateOf(getSavedIp(localContext)) }
 
     val blinkAlpha by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -112,19 +182,55 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
         label = "BlinkAlpha"
     )
 
+    val blinkWarning by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 50, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BlinkWarning"
+    )
+
     val dotColors = remember {
         listOf(
-            Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), // 1-5
-            Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), // 6-10
-            Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF)  // 11-15
+            Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), // 1-6
+            Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), // 7-12
+            Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF) // 13-16
         )
+    }
+    if (showSettings) {
+        SettingsDialog(
+            currentIp = currentIp,
+            onDismiss = { showSettings = false },
+            onSave = { newIp ->
+                saveIp(localContext, newIp)
+                currentIp = newIp
+                showSettings = false
+            }
+        )
+    }
+
+    val bgColor = when {
+        isWarningLightActive -> Color(0xFFFF0000).copy(alpha = blinkWarning)
+        else -> Color(0xFF2C2C2C)
+    }
+
+    @SuppressLint("DefaultLocale")
+    fun formatTime(timeInMillis: Long): String {
+        val milliseconds = timeInMillis % 1000
+        val totalSeconds = timeInMillis / 1000
+        val seconds = totalSeconds % 60
+        val minutes = totalSeconds / 60
+        return String.format("%d:%02d:%03d", minutes, seconds, milliseconds)
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F))
+            .background(bgColor)
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,16 +246,16 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val rpmPerDot = (shiftPoint - minRpmLights) / 15f
+                    val rpmPerDot = (shiftPoint - minRpmLights) / 16f
 
-                    repeat(15) { index ->
+                    repeat(16) { index ->
                         val dotThreshold = minRpmLights + (index * rpmPerDot)
                         val isDotActive = rpm >= dotThreshold
 
                         val finalColor = when {
                             isShiftLightActive -> Color(0xFF0000FF).copy(alpha = blinkAlpha)
                             isDotActive -> dotColors[index]
-                            else -> Color(0xFF2C2C2C)
+                            else -> Color(0xFF888888)
                         }
 
                         Box(
@@ -164,7 +270,7 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 16.dp),
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -189,23 +295,17 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                     .weight(1f)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 // Gear
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = gear,
                         color = if (gear == "R") Color(0xFFFF0000) else Color.White,
-                        fontSize = 170.sp,
+                        fontSize = 200.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.SansSerif,
-                        modifier = Modifier.height(175.dp)
-                    )
-                    Text(
-                        text = "GEAR",
-                        color = Color(0xFF888888),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        modifier = Modifier.height(200.dp)
                     )
                 }
 
@@ -214,17 +314,41 @@ fun DashboardScreen(speed: Float, rpm: Float, gear: String, isAbsActive: Boolean
                     Text(
                         text = "${speed.toInt()}",
                         color = Color.White,
-                        fontSize = 110.sp,
+                        fontSize = 90.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.SansSerif,
-                        modifier = Modifier.height(115.dp)
+                        modifier = Modifier.height(95.dp)
                     )
                     Text(
                         text = "KM/H",
                         color = if (isShiftLightActive) Color.White else Color(0xFFFFB300),
-                        fontSize = 18.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.SansSerif
+                    )
+                    Text(
+                        text = formatTime(lapTime.toLong()),
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        modifier = Modifier.height(36.dp)
+                    )
+                    Text(
+                        text = formatTime(lapTimeLast.toLong()),
+                        color = if (lapTimeLast == lapTimeBest) Color.Green else Color.Yellow,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        modifier = Modifier.height(26.dp)
+                    )
+                    Text(
+                        text = formatTime(lapTimeBest.toLong()),
+                        color = Color.Green,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        modifier = Modifier.height(26.dp)
                     )
                 }
             }
@@ -249,7 +373,7 @@ fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
         )
     }
 }
-suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, Float, String, Boolean, Boolean) -> Unit) {
+suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, Float, String, Boolean, Boolean, Int, Int, Int) -> Unit) {
     withContext(Dispatchers.IO) {
         var socket: DatagramSocket? = null
         try {
@@ -271,7 +395,7 @@ suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, F
                 val packetConnect = DatagramPacket(bufferConnect.array(), bufferConnect.capacity(), pcAddress, acPort)
                 val packetUpdate = DatagramPacket(bufferUpdate.array(), bufferUpdate.capacity(), pcAddress, acPort)
 
-                while (coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {
+                while (coroutineContext[Job]?.isActive == true) {
                     try {
                         socket.send(packetConnect)
                         delay(50)
@@ -296,9 +420,11 @@ suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, F
                         val speedKmh = buffer.getFloat(8)
                         val rpm = buffer.getFloat(68)
                         val rawGear = buffer.getInt(76)
-
                         val isAbsInAction = buffer.get(21).toInt() == 1
                         val isTcInAction = buffer.get(22).toInt() == 1
+                        val lapTime = buffer.getInt(40)
+                        val lapTimeBest = buffer.getInt(48)
+                        val lapTimeLast = buffer.getInt(44)
 
                         val gearDisplay = when (rawGear) {
                             0 -> "R"
@@ -308,13 +434,13 @@ suspend fun connectToAssettoCorsa(pcIpAddress: String, onDataReceived: (Float, F
 
                         withContext(Dispatchers.Main) {
                             if (speedKmh in 0f..450f && rpm in 0f..22000f) {
-                                onDataReceived(speedKmh, rpm, gearDisplay, isAbsInAction, isTcInAction)
+                                onDataReceived(speedKmh, rpm, gearDisplay, isAbsInAction, isTcInAction, lapTime, lapTimeBest, lapTimeLast)
                             } else {
-                                onDataReceived(speedKmh, if (rpm > 0f) rpm else 0f, gearDisplay, isAbsInAction, isTcInAction)
+                                onDataReceived(speedKmh, if (rpm > 0f) rpm else 0f, gearDisplay, isAbsInAction, isTcInAction, lapTime,  lapTimeBest, lapTimeLast)
                             }
                         }
                     }
-                } catch (_: java.net.SocketTimeoutException) {
+                } catch (_: SocketTimeoutException) {
                     // Timeout
                 } catch (_: Exception) {
                     delay(100)
