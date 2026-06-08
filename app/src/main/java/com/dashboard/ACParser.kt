@@ -22,7 +22,7 @@ class ACParser {
         onDataReceived: (
             speed: Float,
             rpm: Float,
-            maxrpm: Float,
+            maxRpm: Float,
             gear: String,
             isAbs: Boolean,
             isTc: Boolean,

@@ -22,7 +22,7 @@ class GT7Parser {
         onDataReceived: (
             speed: Float,
             rpm: Float,
-            maxrmp: Float,
+            maxRmp: Float,
             gear: String,
             isAbs: Boolean,
             isTc: Boolean,
@@ -47,7 +47,7 @@ class GT7Parser {
             val ps4Address = InetAddress.getByName(ps4IpAddress)
 
             val handshakeJob = launch(Dispatchers.IO) {
-                val heartbeatBuffer = ByteBuffer.allocate(1).apply { put(0x41) }
+                val heartbeatBuffer = ByteBuffer.allocate(1).apply { put(0x43) }
                 val packetHeartbeat = DatagramPacket(
                     heartbeatBuffer.array(),
                     heartbeatBuffer.capacity(),
@@ -86,13 +86,15 @@ class GT7Parser {
 
                         val decryptedData = decrypt.decryptGT7Packet(packetData)
 
-                        if (decryptedData != null && decryptedData.size >= 296) {
+                        if (decryptedData != null && decryptedData.size >= 368) {
                             val buffer = ByteBuffer.wrap(decryptedData).order(ByteOrder.LITTLE_ENDIAN)
                             val magic = buffer.getInt(0)
 
                             if (magic == 0x47375330) {
 
                                 val speedMs = buffer.getFloat(0x4C)
+
+                                // calibrate maxRpm
                                 val rpm = buffer.getFloat(0x3C)
                                 if (rpm > maxRpm) {
                                     maxRpm = rpm
@@ -101,21 +103,26 @@ class GT7Parser {
                                 val rawGearInfo = buffer.get(0x90).toInt()
                                 val currentGear = rawGearInfo and 0x0F
 
-                                val isTcInAction = false
-                                val isAbsInAction = false
+                                // preparing ABS data
+                                val brakePhysical = buffer.get(0x92).toInt() and 0xFF
+                                val brakeActuated = buffer.get(0x13D).toInt() and 0xFF
+                                val isAbsInAction = (brakePhysical > 10) && ((brakePhysical - brakeActuated) > 10)
 
+                                // preparing TC data
+                                val throttleFiltered = buffer.get(0x91).toInt() and 0xFF
+                                val throttlePhysical = buffer.get(0x13C).toInt() and 0xFF
+                                val isTcInAction = (throttlePhysical - throttleFiltered) > 5
+
+                                // preparing laptimes
                                 val lapTimeBest = buffer.getInt(0x78)
                                 val lapTimeLast = buffer.getInt(0x7C)
-
                                 val currentTotalTime = buffer.getInt(0x80)
                                 if (lapTimeLast != lastLapTimeLast) {
                                     lastLapTimeLast = lapTimeLast
                                     currentLapStartTime = currentTotalTime
                                 }
-
                                 val lapTime = currentTotalTime - currentLapStartTime
 
-                                Log.w("GT7Parser", "laptime: $lapTime")
                                 val gearDisplay = when (currentGear) {
                                     0 -> "R"
                                     15 -> "N"

@@ -35,11 +35,11 @@ import androidx.compose.ui.unit.sp
 class DrawDashboard {
     @Composable
     fun DashboardScreen(viewModel: DashboardViewModel) {
-        val maxrpm = viewModel.maxRpmState.floatValue
+        val maxRpm = viewModel.maxRpmState.floatValue
 
-        val minRpmLights = maxrpm * 0.7f
-        val shiftPoint = maxrpm * 0.9f
-        val warningPoint = maxrpm * 0.95f
+        val minRpmLights = maxRpm * 0.7f
+        val shiftPoint = maxRpm * 0.9f
+        val warningPoint = maxRpm * 0.95f
         val isWarningLightActive = viewModel.rpmState.floatValue >= warningPoint
         val isShiftLightActive = viewModel.rpmState.floatValue >= shiftPoint
         val infiniteTransition = rememberInfiniteTransition(label = "BlinkerTransition")

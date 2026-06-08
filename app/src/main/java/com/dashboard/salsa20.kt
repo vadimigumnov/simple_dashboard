@@ -18,10 +18,19 @@ class Salsa20 {
     fun decryptGT7Packet(data: ByteArray): ByteArray? {
         return try {
             val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+            val packetLength = data.size
 
             val ivPart1 = buffer.getInt(0x40)
 
-            val ivPart2 = ivPart1 xor 0xDEADBEAFL.toInt()
+            val xorMask = when (packetLength) {
+                296 -> 0xDEADBEAFL.toInt()
+                316 -> 0xDEADBEEFL.toInt()
+                368 -> 0xDEADBEEFL.toInt()
+                else -> 0xDEADBEAFL.toInt()
+            }
+
+            val ivPart2 = ivPart1 xor xorMask
+
 
             val ivBytes = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
                 .putInt(ivPart2) //
