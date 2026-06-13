@@ -72,7 +72,7 @@ class GT7Parser {
 
             Log.d("GT7Parser", "Listening for Gran Turismo 7 on port $gt7ReceivePort...")
 
-            var maxRpm = 5000f
+            var maxRpm = 4000f
 
             while (isRunning) {
                 try {

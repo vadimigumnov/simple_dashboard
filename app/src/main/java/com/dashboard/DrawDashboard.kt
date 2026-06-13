@@ -24,11 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -37,7 +39,7 @@ class DrawDashboard {
     fun DashboardScreen(viewModel: DashboardViewModel) {
         val maxRpm = viewModel.maxRpmState.floatValue
 
-        val minRpmLights = maxRpm * 0.7f
+        val minRpmLights = maxRpm * 0.85f
         val shiftPoint = maxRpm * 0.9f
         val warningPoint = maxRpm * 0.95f
         val isWarningLightActive = viewModel.rpmState.floatValue >= warningPoint
@@ -54,16 +56,6 @@ class DrawDashboard {
             label = "BlinkAlpha"
         )
 
-        val blinkWarning by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 0.8f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 50, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "BlinkWarning"
-        )
-
         val dotColors = remember {
             listOf(
                 Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), // 1-6
@@ -73,7 +65,7 @@ class DrawDashboard {
         }
 
         val bgColor = when {
-            isWarningLightActive -> Color(0xFFFF0000).copy(alpha = blinkWarning)
+            isWarningLightActive -> Color(0xFFFF0000).copy(alpha = blinkAlpha)
             else -> Color(0xFF2C2C2C)
         }
 
@@ -94,7 +86,7 @@ class DrawDashboard {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 48.dp, vertical = 32.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.SpaceEvenly,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -103,7 +95,7 @@ class DrawDashboard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = CenterVertically
                     ) {
                         val rpmPerDot = (shiftPoint - minRpmLights) / 16f
 
@@ -114,7 +106,7 @@ class DrawDashboard {
                             val finalColor = when {
                                 isShiftLightActive -> Color(0xFF0000FF).copy(alpha = blinkAlpha)
                                 isDotActive -> dotColors[index]
-                                else -> Color(0xFF888888)
+                                else -> Color(0xFF242424)
                             }
 
                             Box(
@@ -125,89 +117,87 @@ class DrawDashboard {
                             )
                         }
                     }
+                }
 
-                    Row(
+                Row(
+                    modifier = Modifier
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = CenterVertically
+                ) {
+                    // Speed, ABS, TC, RPM
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             IndicatorLight(text = "ABS", isActive = viewModel.absState.value, activeColor = Color.Cyan)
                             IndicatorLight(text = "TC", isActive = viewModel.tcState.value, activeColor = Color.Yellow)
                         }
-
-                        Text(
-                            text = "${viewModel.rpmState.floatValue.toInt()} RPM",
-                            color = if (isShiftLightActive) Color.White else Color(0xFF888888),
-                            fontSize = 14.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    // Gear
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = viewModel.gearState.value,
-                            color = if (viewModel.gearState.value == "R") Color(0xFFFF0000) else Color.White,
-                            fontSize = 200.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.SansSerif,
-                            modifier = Modifier.height(200.dp)
-                        )
-                    }
-
-                    // Speed
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "${viewModel.speedState.floatValue.toInt()}",
                             color = Color.White,
-                            fontSize = 90.sp,
+                            fontSize = 120.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            modifier = Modifier.height(95.dp)
+                            modifier = Modifier.height(130.dp)
                         )
                         Text(
-                            text = "KM/H",
-                            color = if (isShiftLightActive) Color.White else Color(0xFFFFB300),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif
+                            text = "${viewModel.rpmState.floatValue.toInt()} RPM",
+                            color = if (isShiftLightActive) Color.White else Color(0xFF888888),
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.height(20.dp)
                         )
+                    }
+                    // Gear
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = viewModel.gearState.value,
+                            color = if (viewModel.gearState.value == "R") Color(0xFFFF0000) else Color.White,
+                            fontSize = 300.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.SansSerif,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    // Lap Time
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
                             text = formatTime(viewModel.lapTimeState.intValue.toLong()),
                             color = Color.White,
-                            fontSize = 32.sp,
+                            fontSize = 26.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            modifier = Modifier.height(36.dp)
+                            modifier = Modifier.height(44.dp)
                         )
                         Text(
                             text = formatTime(viewModel.lapTimeLastState.intValue.toLong()),
-                            color = if (viewModel.lapTimeLastState.intValue == viewModel.lapTimeBestState.intValue) Color.Green else Color.Yellow,
+                            color = if (viewModel.lapTimeLastState.intValue == viewModel.lapTimeBestState.intValue) Color.Green else Color(0xFFB83A1D),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            modifier = Modifier.height(26.dp)
+                            modifier = Modifier.height(40.dp)
                         )
                         Text(
                             text = formatTime(viewModel.lapTimeBestState.intValue.toLong()),
-                            color = Color.Green,
+                            color = Color(0xFF7405A3),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            modifier = Modifier.height(26.dp)
+                            modifier = Modifier.height(40.dp)
                         )
                     }
                 }

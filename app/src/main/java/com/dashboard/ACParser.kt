@@ -70,8 +70,8 @@ class ACParser {
             val receiveBuffer = ByteArray(512)
             val incomingPacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
 
-            Log.d("ACParser", "Listening for Assetto Corsa...")
-            var maxRpm = 5000f
+            var maxRpm = 4000f
+
             while (isRunning) {
                 try {
                     socket?.receive(incomingPacket)
