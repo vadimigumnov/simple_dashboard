@@ -72,11 +72,12 @@ class DashboardViewModel : ViewModel() {
     val lapTimeState = mutableIntStateOf(0)
     val lapTimeBestState = mutableIntStateOf(0)
     val lapTimeLastState = mutableIntStateOf(0)
+    val timeStampState = mutableLongStateOf(0L)
 
     private val acParser = ACParser()
     fun startACTracking(targetIp: String) {
         viewModelScope.launch {
-            acParser.connectToAssettoCorsa(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast ->
+            acParser.connectToAssettoCorsa(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast, timeStamp ->
                 speedState.floatValue = speed
                 rpmState.floatValue = rpm
                 maxRpmState.floatValue = maxRpm
@@ -86,6 +87,7 @@ class DashboardViewModel : ViewModel() {
                 lapTimeState.intValue = lapTime
                 lapTimeBestState.intValue = lapTimeBest
                 lapTimeLastState.intValue = lapTimeLast
+                timeStampState.longValue = timeStamp
             }
         }
     }
@@ -93,7 +95,7 @@ class DashboardViewModel : ViewModel() {
     private val gt7Parser = GT7Parser()
     fun startGt7Tracking(targetIp: String) {
         viewModelScope.launch {
-            gt7Parser.connectToGranTurismo7(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast ->
+            gt7Parser.connectToGranTurismo7(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast, timeStamp ->
                 speedState.floatValue = speed
                 rpmState.floatValue = rpm
                 maxRpmState.floatValue = maxRpm
@@ -103,6 +105,7 @@ class DashboardViewModel : ViewModel() {
                 lapTimeState.intValue = lapTime
                 lapTimeBestState.intValue = lapTimeBest
                 lapTimeLastState.intValue = lapTimeLast
+                timeStampState.longValue = timeStamp
             }
         }
     }

@@ -28,7 +28,8 @@ class GT7Parser {
             isTc: Boolean,
             lapTime: Int,
             lapTimeBest: Int,
-            lapTimeLast: Int
+            lapTimeLast: Int,
+            timeStamp: Long
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
@@ -90,6 +91,8 @@ class GT7Parser {
                             val buffer = ByteBuffer.wrap(decryptedData).order(ByteOrder.LITTLE_ENDIAN)
                             val magic = buffer.getInt(0)
 
+                            val timeStamp = System.currentTimeMillis()
+
                             if (magic == 0x47375330) {
 
                                 val speedMs = buffer.getFloat(0x4C)
@@ -141,7 +144,9 @@ class GT7Parser {
                                     isTcInAction,
                                     lapTime,
                                     lapTimeBest,
-                                    lapTimeLast
+                                    lapTimeLast,
+                                    timeStamp
+
                                 )
                             } else {
                                 Log.w("GT7Parser", "Decrypted, but invalid magic signature: $magic")
@@ -160,6 +165,18 @@ class GT7Parser {
         } catch (e: Exception) {
             Log.e("GT7Parser", "Critical error: ${e.message}")
         } finally {
+            onDataReceived(
+                0f,
+                0f,
+                0f,
+                "--",
+                false,
+                false,
+                -1,
+                -1,
+                -1,
+                0L
+            )
             closeSocket()
         }
     }

@@ -28,7 +28,8 @@ class ACParser {
             isTc: Boolean,
             lapTime: Int,
             lapTimeBest: Int,
-            lapTimeLast: Int
+            lapTimeLast: Int,
+            timeStamp: Long
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
@@ -77,6 +78,8 @@ class ACParser {
                     socket?.receive(incomingPacket)
 
                     if (incomingPacket.length == 328) {
+
+                        val timeStamp = System.currentTimeMillis()
                         val buffer = ByteBuffer.wrap(incomingPacket.data, 0, incomingPacket.length)
                             .order(ByteOrder.LITTLE_ENDIAN)
 
@@ -110,7 +113,8 @@ class ACParser {
                             isTcInAction,
                             lapTime,
                             lapTimeBest,
-                            lapTimeLast
+                            lapTimeLast,
+                            timeStamp
                         )
                     }
                 } catch (_: SocketTimeoutException) {
@@ -125,6 +129,18 @@ class ACParser {
         } catch (e: Exception) {
             Log.e("ACParser", "Critical error: ${e.message}")
         } finally {
+           onDataReceived(
+                0f,
+                0f,
+                0f,
+                "--",
+                false,
+                false,
+                -1,
+                -1,
+                -1,
+                0L
+            )
             closeSocket()
         }
     }
