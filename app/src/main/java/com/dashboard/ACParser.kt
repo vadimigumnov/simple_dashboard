@@ -36,6 +36,20 @@ class ACParser {
         val acPort = 9996
         isRunning = true
 
+        val sendFallbackData = {
+            onDataReceived(
+                0f,
+                0f,
+                0f,
+                "--",
+                false,
+                false,
+                -1,
+                -1,
+                -1,
+                0L
+            )
+        }
         try {
             socket = DatagramSocket()
             socket?.soTimeout = 1500
@@ -84,10 +98,12 @@ class ACParser {
                             .order(ByteOrder.LITTLE_ENDIAN)
 
                         val speedKmh = buffer.getFloat(8)
+
                         val rpm = buffer.getFloat(68)
                         if (rpm > maxRpm) {
                             maxRpm = rpm
                         }
+
                         val rawGear = buffer.getInt(76)
                         val isAbsInAction = buffer.get(21).toInt() == 1
                         val isTcInAction = buffer.get(22).toInt() == 1
@@ -118,6 +134,8 @@ class ACParser {
                         )
                     }
                 } catch (_: SocketTimeoutException) {
+                    maxRpm = 4000f
+                    sendFallbackData()
                 } catch (e: Exception) {
                     Log.e("ACParser", "Receive error: ${e.message}")
                     delay(100)
@@ -129,18 +147,7 @@ class ACParser {
         } catch (e: Exception) {
             Log.e("ACParser", "Critical error: ${e.message}")
         } finally {
-           onDataReceived(
-                0f,
-                0f,
-                0f,
-                "--",
-                false,
-                false,
-                -1,
-                -1,
-                -1,
-                0L
-            )
+            sendFallbackData()
             closeSocket()
         }
     }
