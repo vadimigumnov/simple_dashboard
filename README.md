@@ -1,4 +1,4 @@
-# Simple Dashboard for RBR & Assetto Corsa (v0.2)
+# Simple Dashboard (v0.2)
 
 An Android-based digital dashboard application designed for sim racing enthusiasts. It receives real-time telemetry via UDP broadcast and displays critical racing data on your mobile device, mimicking a professional rally/race car display.
 
@@ -11,7 +11,7 @@ An Android-based digital dashboard application designed for sim racing enthusias
 * **Connection Watchdog:** Automatically switches to a "Waiting for data..." screen with an animated spinner if telemetry drops for more than 1 second.
 
 ## Tech Stack
-* **Platform:** Android
+* **Platform:** Android 8+
 * **UI Framework:** Jetpack Compose (Modern, fully declarative UI with smooth `rememberInfiniteTransition` animations)
 * **Asynchrony:** Kotlin Coroutines & Flows
 * **Network:** UDP Socket Listener
