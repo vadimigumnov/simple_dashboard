@@ -68,6 +68,17 @@ fun StartupMenu(
                         Text("Assetto Corsa", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(
+                        //onClick = { selectedGame = GameType.RBR },
+                        onClick = {onGameSelected(GameType.RBR, "192.168.1.1")},
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF805500)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(240.dp, 60.dp)
+                    ) {
+                        Text("Richard Burns Rally", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -128,5 +139,5 @@ fun StartupMenu(
 }
 
 enum class GameType {
-    GT7, AC
+    GT7, AC, RBR
 }

@@ -42,19 +42,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-class DrawDashboard {
+class RallyDashboard {
     @Composable
     fun DashboardScreen(viewModel: DashboardViewModel) {
         var timeStamp: Long
-        var currentTime: Long
+        var currentTimeStamp: Long
         var isDataValid by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             while (true) {
                 timeStamp = viewModel.timeStampState.longValue
-                currentTime = System.currentTimeMillis()
+                currentTimeStamp = System.currentTimeMillis()
                 delay(500)
-                isDataValid = (currentTime - timeStamp < 1000) && timeStamp != 0L
+                isDataValid = (currentTimeStamp - timeStamp < 1000) && timeStamp != 0L
             }
         }
 
@@ -63,14 +63,11 @@ class DrawDashboard {
             val maxRpm = viewModel.maxRpmState.floatValue
             val rpmValue = viewModel.rpmState.floatValue
             val currentSpeed = viewModel.speedState.floatValue
-            val absState = viewModel.absState.value
-            val tcState = viewModel.tcState.value
             val currentGear = viewModel.gearState.value
-            val currentLapTime = viewModel.lapTimeState.intValue
-            val lastLapTime = viewModel.lapTimeLastState.intValue
-            val bestLapTime = viewModel.lapTimeBestState.intValue
+            val currentTime = viewModel.time0State.intValue
+            val engineTemp = viewModel.paramState.intValue
 
-            val minRpmLights = maxRpm * 0.85f
+            val minRpmLights = maxRpm * 0.80f
             val shiftPoint = maxRpm * 0.9f
             val warningPoint = maxRpm * 0.95f
             val isWarningLightActive = rpmValue >= warningPoint
@@ -108,24 +105,6 @@ class DrawDashboard {
                 val seconds = totalSeconds % 60
                 val minutes = totalSeconds / 60
                 return String.format("%d:%02d:%03d", minutes, seconds, milliseconds)
-            }
-
-            @Composable
-            fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isActive) activeColor else Color(0xFF2C2C2C))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = text,
-                        color = if (isActive) Color.Black else Color(0xFF555555),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
             }
 
             Box(
@@ -182,10 +161,6 @@ class DrawDashboard {
                             verticalArrangement = Arrangement.SpaceEvenly,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                IndicatorLight(text = "ABS", isActive = absState, activeColor = Color.Cyan)
-                                IndicatorLight(text = "TC", isActive = tcState, activeColor = Color.Yellow)
-                            }
                             Text(
                                 text = "${currentSpeed.toInt()}",
                                 color = Color.White,
@@ -226,7 +201,7 @@ class DrawDashboard {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = formatTime(currentLapTime.toLong()),
+                                text = formatTime(currentTime.toLong()),
                                 color = Color.White,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold,
@@ -234,17 +209,9 @@ class DrawDashboard {
                                 modifier = Modifier.height(44.dp)
                             )
                             Text(
-                                text = formatTime(lastLapTime.toLong()),
-                                color = if (lastLapTime == bestLapTime) Color.Green else Color(0xFFB83A1D),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.SansSerif,
-                                modifier = Modifier.height(40.dp)
-                            )
-                            Text(
-                                text = formatTime(bestLapTime.toLong()),
-                                color = Color(0xFF7405A3),
-                                fontSize = 24.sp,
+                                text = "Oil temp: ${engineTemp}\u00B0C",
+                                color = if (engineTemp > 100) Color(0xFFFF0000) else if (engineTemp > 89) Color(0xFF9BC902) else Color(0xFFCFCFCF),
+                                fontSize = if (engineTemp > 105) 28.sp else 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.SansSerif,
                                 modifier = Modifier.height(40.dp)
@@ -278,7 +245,7 @@ class DrawDashboard {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Waiting for data...",
+                        text = "Waiting for live data...",
                         color = Color.Red,
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
@@ -286,16 +253,16 @@ class DrawDashboard {
                         modifier = Modifier.height(60.dp),
                         textAlign = TextAlign.Center
                     )
-                   Image(
-                       painter = painterResource(id = R.drawable.ic_dashboard_spinner),
-                       colorFilter = ColorFilter.tint(Color.White),
-                       modifier = Modifier
-                           .size(64.dp)
-                           .graphicsLayer {
-                               rotationZ = angle
-                           },
-                       contentDescription = "spinner",
-                   )
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dashboard_spinner),
+                        colorFilter = ColorFilter.tint(Color.White),
+                        modifier = Modifier
+                            .size(64.dp)
+                            .graphicsLayer {
+                                rotationZ = angle
+                            },
+                        contentDescription = "spinner",
+                    )
                 }
             }
         }

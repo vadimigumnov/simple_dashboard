@@ -3,21 +3,20 @@ package com.dashboard
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.absoluteValue
 
-class ACParser {
+class RBRParser {
 
     private var socket: DatagramSocket? = null
     private var isRunning = false
 
-    suspend fun connectToAssettoCorsa(
+    suspend fun connectToRBR(
         pcIpAddress: String,
         onDataReceived: (
             speed: Float,
@@ -34,7 +33,7 @@ class ACParser {
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
-        val acPort = 9996
+        val rbrPort = 6776
         isRunning = true
 
         val sendFallbackData = {
@@ -53,38 +52,10 @@ class ACParser {
             )
         }
         try {
-            socket = DatagramSocket()
+            socket = DatagramSocket(rbrPort)
             socket?.soTimeout = 1500
 
-            val pcAddress = InetAddress.getByName(pcIpAddress)
-
-            val handshakeJob = launch(Dispatchers.IO) {
-                val bufferConnect = ByteBuffer.allocate(12).apply {
-                    order(ByteOrder.LITTLE_ENDIAN)
-                    putInt(1).putInt(1).putInt(0)
-                }
-                val bufferUpdate = ByteBuffer.allocate(12).apply {
-                    order(ByteOrder.LITTLE_ENDIAN)
-                    putInt(1).putInt(1).putInt(1)
-                }
-
-                val packetConnect = DatagramPacket(bufferConnect.array(), bufferConnect.capacity(), pcAddress, acPort)
-                val packetUpdate = DatagramPacket(bufferUpdate.array(), bufferUpdate.capacity(), pcAddress, acPort)
-
-                while (isRunning) {
-                    try {
-                        socket?.send(packetConnect)
-                        delay(50)
-                        socket?.send(packetUpdate)
-                        Log.d("ACParser", "Handshake packets sent to AC...")
-                    } catch (e: Exception) {
-                        Log.e("ACParser", "Handshake error: ${e.message}")
-                    }
-                    delay(1000)
-                }
-            }
-
-            val receiveBuffer = ByteArray(512)
+            val receiveBuffer = ByteArray(664)
             val incomingPacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
 
             var maxRpm = 4000f
@@ -93,26 +64,25 @@ class ACParser {
                 try {
                     socket?.receive(incomingPacket)
 
-                    if (incomingPacket.length == 328) {
-
+                    if (incomingPacket.length == 664) {
                         val timeStamp = System.currentTimeMillis()
                         val buffer = ByteBuffer.wrap(incomingPacket.data, 0, incomingPacket.length)
                             .order(ByteOrder.LITTLE_ENDIAN)
 
-                        val speedKmh = buffer.getFloat(8)
+                        val speedKmh = buffer.getFloat(60).absoluteValue
 
-                        val rpm = buffer.getFloat(68)
+                        val rpm = buffer.getFloat(136)
                         if (rpm > maxRpm) {
                             maxRpm = rpm
                         }
 
-                        val rawGear = buffer.getInt(76)
-                        val isAbsInAction = buffer.get(21).toInt() == 1
-                        val isTcInAction = buffer.get(22).toInt() == 1
-                        val time0 = buffer.getInt(40)
-                        val time1 = buffer.getInt(48)
-                        val time2 = buffer.getInt(44)
-                        val param = -1
+                        val rawGear = buffer.getInt(44)
+                        val isAbsInAction = false
+                        val isTcInAction = false
+                        val time0 = (buffer.getFloat(12) * 1000).toInt()
+                        val time1 = -1
+                        val time2 = -1
+                        val param = (buffer.getFloat(148)-273.15f).toInt() //engine temperature
 
                         val gearDisplay = when (rawGear) {
                             0 -> "R"
@@ -141,15 +111,12 @@ class ACParser {
                     maxRpm = 4000f
                     sendFallbackData()
                 } catch (e: Exception) {
-                    Log.e("ACParser", "Receive error: ${e.message}")
+                    Log.e("RBRParser", "Receive error: ${e.message}")
                     delay(100)
                 }
             }
-
-            handshakeJob.cancel()
-
         } catch (e: Exception) {
-            Log.e("ACParser", "Critical error: ${e.message}")
+            Log.e("RBRParser", "Critical error: ${e.message}")
         } finally {
             sendFallbackData()
             closeSocket()

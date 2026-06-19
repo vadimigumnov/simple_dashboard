@@ -26,9 +26,10 @@ class GT7Parser {
             gear: String,
             isAbs: Boolean,
             isTc: Boolean,
-            lapTime: Int,
-            lapTimeBest: Int,
-            lapTimeLast: Int,
+            time0: Int,
+            time1: Int,
+            time2: Int,
+            param: Int,
             timeStamp: Long
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
@@ -49,6 +50,7 @@ class GT7Parser {
                 "--",
                 false,
                 false,
+                -1,
                 -1,
                 -1,
                 -1,
@@ -152,14 +154,15 @@ class GT7Parser {
                                 val isTcInAction = (throttlePhysical - throttleFiltered) > 5
 
                                 // preparing laptimes
-                                val lapTimeBest = buffer.getInt(0x78)
-                                val lapTimeLast = buffer.getInt(0x7C)
+                                val time2 = buffer.getInt(0x78)
+                                val time1 = buffer.getInt(0x7C)
                                 val currentTotalTime = buffer.getInt(0x80)
-                                if (lapTimeLast != lastLapTimeLast) {
-                                    lastLapTimeLast = lapTimeLast
+                                if (time1 != lastLapTimeLast) {
+                                    lastLapTimeLast = time1
                                     currentLapStartTime = currentTotalTime
                                 }
-                                val lapTime = currentTotalTime - currentLapStartTime
+                                val time0 = currentTotalTime - currentLapStartTime
+                                val param = -1
 
                                 // sending prepared data
                                 if (isRaceActive) {
@@ -170,9 +173,10 @@ class GT7Parser {
                                         gearDisplay,
                                         isAbsInAction,
                                         isTcInAction,
-                                        lapTime,
-                                        lapTimeBest,
-                                        lapTimeLast,
+                                        time0,
+                                        time1,
+                                        time2,
+                                        param,
                                         timeStamp
                                     )
                                 }

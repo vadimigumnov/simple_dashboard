@@ -24,24 +24,33 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
-        val dashboard = DrawDashboard()
+        val regularDashboard = RegularDashboard()
+        val rallyDashboard = RallyDashboard()
 
         setContent {
             var currentScreen by rememberSaveable { mutableStateOf("menu") }
+            var activePreset by rememberSaveable { mutableStateOf<GameType?>(null) }
 
             when (currentScreen) {
                 "menu" -> {
                     StartupMenu(onGameSelected = { gameType, ip ->
-                        if (gameType == GameType.GT7) {
-                            viewModel.startGt7Tracking(ip)
-                        } else {
-                            viewModel.startACTracking(ip)
+
+                        activePreset = gameType
+                        when (gameType) {
+                            GameType.GT7 -> viewModel.startGt7Tracking(ip)
+                            GameType.AC -> viewModel.startACTracking(ip)
+                            GameType.RBR -> viewModel.startRBRTracking(ip)
                         }
                         currentScreen = "dashboard"
                     })
                 }
                 "dashboard" -> {
-                    dashboard.DashboardScreen(viewModel = viewModel)
+                    when(activePreset) {
+                        GameType.GT7 -> regularDashboard.DashboardScreen(viewModel = viewModel)
+                        GameType.AC -> regularDashboard.DashboardScreen(viewModel = viewModel)
+                        GameType.RBR -> rallyDashboard.DashboardScreen(viewModel = viewModel)
+                        null -> {}
+                    }
                 }
             }
         }
@@ -69,24 +78,26 @@ class DashboardViewModel : ViewModel() {
     val gearState = mutableStateOf("N")
     val absState = mutableStateOf(false)
     val tcState = mutableStateOf(false)
-    val lapTimeState = mutableIntStateOf(0)
-    val lapTimeBestState = mutableIntStateOf(0)
-    val lapTimeLastState = mutableIntStateOf(0)
+    val time0State = mutableIntStateOf(0)
+    val time1State = mutableIntStateOf(0)
+    val time2State = mutableIntStateOf(0)
+    val paramState = mutableIntStateOf(0)
     val timeStampState = mutableLongStateOf(0L)
 
     private val acParser = ACParser()
     fun startACTracking(targetIp: String) {
         viewModelScope.launch {
-            acParser.connectToAssettoCorsa(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast, timeStamp ->
+            acParser.connectToAssettoCorsa(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, time0, time1, time2, param, timeStamp ->
                 speedState.floatValue = speed
                 rpmState.floatValue = rpm
                 maxRpmState.floatValue = maxRpm
                 gearState.value = gear
                 absState.value = isAbs
                 tcState.value = isTc
-                lapTimeState.intValue = lapTime
-                lapTimeBestState.intValue = lapTimeBest
-                lapTimeLastState.intValue = lapTimeLast
+                time0State.intValue = time0
+                time1State.intValue = time1
+                time2State.intValue = time2
+                paramState.intValue = param
                 timeStampState.longValue = timeStamp
             }
         }
@@ -95,16 +106,36 @@ class DashboardViewModel : ViewModel() {
     private val gt7Parser = GT7Parser()
     fun startGt7Tracking(targetIp: String) {
         viewModelScope.launch {
-            gt7Parser.connectToGranTurismo7(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, lapTime, lapTimeBest, lapTimeLast, timeStamp ->
+            gt7Parser.connectToGranTurismo7(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, time0, time1, time2, param, timeStamp ->
                 speedState.floatValue = speed
                 rpmState.floatValue = rpm
                 maxRpmState.floatValue = maxRpm
                 gearState.value = gear
                 absState.value = isAbs
                 tcState.value = isTc
-                lapTimeState.intValue = lapTime
-                lapTimeBestState.intValue = lapTimeBest
-                lapTimeLastState.intValue = lapTimeLast
+                time0State.intValue = time0
+                time1State.intValue = time1
+                time2State.intValue = time2
+                paramState.intValue = param
+                timeStampState.longValue = timeStamp
+            }
+        }
+    }
+
+    private val rbrParser = RBRParser()
+    fun startRBRTracking(targetIp: String) {
+        viewModelScope.launch {
+            rbrParser.connectToRBR(targetIp) { speed, rpm, maxRpm, gear, isAbs, isTc, time0, time1, time2, param, timeStamp ->
+                speedState.floatValue = speed
+                rpmState.floatValue = rpm
+                maxRpmState.floatValue = maxRpm
+                gearState.value = gear
+                absState.value = isAbs
+                tcState.value = isTc
+                time0State.intValue = time0
+                time1State.intValue = time1
+                time2State.intValue = time2
+                paramState.intValue = param
                 timeStampState.longValue = timeStamp
             }
         }
@@ -114,5 +145,6 @@ class DashboardViewModel : ViewModel() {
         super.onCleared()
         gt7Parser.stop()
         acParser.stop()
+        rbrParser.stop()
     }
 }
