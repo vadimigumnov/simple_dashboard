@@ -1,14 +1,12 @@
 package com.dashboard
 
 import android.annotation.SuppressLint
-import kotlinx.coroutines.delay
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,16 +31,15 @@ import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
-class RegularDashboard {
+class SimpleDashboard {
     @Composable
     fun DashboardScreen(viewModel: DashboardViewModel) {
         var timeStamp: Long
@@ -53,7 +50,7 @@ class RegularDashboard {
             while (true) {
                 timeStamp = viewModel.timeStampState.longValue
                 currentTime = System.currentTimeMillis()
-                delay(500)
+                delay(200.milliseconds)
                 isDataValid = (currentTime - timeStamp < 1000) && timeStamp != 0L
             }
         }
@@ -90,9 +87,22 @@ class RegularDashboard {
 
             val dotColors = remember {
                 listOf(
-                    Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), Color(0xFF00FF00), // 1-6
-                    Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), Color(0xFFFF0000), // 7-12
-                    Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF), Color(0xFF0000FF) // 13-16
+                    Color(0xFF00FF00),
+                    Color(0xFF00FF00),
+                    Color(0xFF00FF00),
+                    Color(0xFF00FF00),
+                    Color(0xFF00FF00),
+                    Color(0xFF00FF00), // 1-6
+                    Color(0xFFFF0000),
+                    Color(0xFFFF0000),
+                    Color(0xFFFF0000),
+                    Color(0xFFFF0000),
+                    Color(0xFFFF0000),
+                    Color(0xFFFF0000), // 7-12
+                    Color(0xFF0000FF),
+                    Color(0xFF0000FF),
+                    Color(0xFF0000FF),
+                    Color(0xFF0000FF) // 13-16
                 )
             }
 
@@ -136,7 +146,7 @@ class RegularDashboard {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 32.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -183,8 +193,16 @@ class RegularDashboard {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                IndicatorLight(text = "ABS", isActive = absState, activeColor = Color.Cyan)
-                                IndicatorLight(text = "TC", isActive = tcState, activeColor = Color.Yellow)
+                                IndicatorLight(
+                                    text = "ABS",
+                                    isActive = absState,
+                                    activeColor = Color.Cyan
+                                )
+                                IndicatorLight(
+                                    text = "TC",
+                                    isActive = tcState,
+                                    activeColor = Color.Yellow
+                                )
                             }
                             Text(
                                 text = "${currentSpeed.toInt()}",
@@ -235,7 +253,9 @@ class RegularDashboard {
                             )
                             Text(
                                 text = formatTime(lastLapTime.toLong()),
-                                color = if (lastLapTime == bestLapTime) Color.Green else Color(0xFFB83A1D),
+                                color = if (lastLapTime == bestLapTime) Color.Green else Color(
+                                    0xFFB83A1D
+                                ),
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.SansSerif,
@@ -251,51 +271,6 @@ class RegularDashboard {
                             )
                         }
                     }
-                }
-            }
-        } else {
-            val infiniteTransition = rememberInfiniteTransition(label = "spinner")
-            val angle by infiniteTransition.animateFloat(
-                initialValue = -45f,
-                targetValue = 45f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1200, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "rotation"
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Waiting for live data...",
-                        color = Color.Red,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif,
-                        modifier = Modifier.height(60.dp),
-                        textAlign = TextAlign.Center
-                    )
-                   Image(
-                       painter = painterResource(id = R.drawable.ic_dashboard_spinner),
-                       colorFilter = ColorFilter.tint(Color.White),
-                       modifier = Modifier
-                           .size(64.dp)
-                           .graphicsLayer {
-                               rotationZ = angle
-                           },
-                       contentDescription = "spinner",
-                   )
                 }
             }
         }

@@ -11,6 +11,8 @@ import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration.Companion.milliseconds
 
 class GT7Parser {
 
@@ -19,18 +21,11 @@ class GT7Parser {
 
     suspend fun connectToGranTurismo7(
         ps4IpAddress: String,
+        ps4Port: String,
         onDataReceived: (
-            speed: Float,
-            rpm: Float,
-            maxRmp: Float,
-            gear: String,
-            isAbs: Boolean,
-            isTc: Boolean,
-            time0: Int,
-            time1: Int,
-            time2: Int,
-            param: Int,
-            timeStamp: Long
+            speed: Float, rpm: Float, maxRmp: Float, gear: String,
+            isAbs: Boolean, isTc: Boolean, time0: Int, time1: Int,
+            time2: Int, param: Int, timeStamp: Long
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
@@ -43,44 +38,46 @@ class GT7Parser {
         isRunning = true
 
         val sendFallbackData = {
-            onDataReceived(
-                0f,
-                0f,
-                0f,
-                "--",
-                false,
-                false,
-                -1,
-                -1,
-                -1,
-                -1,
-                0L
-            )
+            onDataReceived(0f, 0f, 0f, "--", false, false, -1, -1, -1, -1, 0L)
         }
 
         try {
             socket = DatagramSocket(gt7ReceivePort)
             socket?.soTimeout = 1500
 
-            val ps4Address = InetAddress.getByName(ps4IpAddress)
+            socket?.broadcast = true
+
+            val isAutoDiscovery = ps4IpAddress.isEmpty() || ps4IpAddress.equals(
+                "auto",
+                ignoreCase = true
+            ) || ps4IpAddress == "255.255.255.255"
+
+            val currentTargetAddress =
+                AtomicReference(InetAddress.getByName(if (isAutoDiscovery) "255.255.255.255" else ps4IpAddress))
 
             val handshakeJob = launch(Dispatchers.IO) {
                 val heartbeatBuffer = ByteBuffer.allocate(1).apply { put(0x43) }
-                val packetHeartbeat = DatagramPacket(
-                    heartbeatBuffer.array(),
-                    heartbeatBuffer.capacity(),
-                    ps4Address,
-                    gt7HeartbeatPort
-                )
 
                 while (isRunning) {
                     try {
+                        val packetHeartbeat = DatagramPacket(
+                            heartbeatBuffer.array(),
+                            heartbeatBuffer.capacity(),
+                            currentTargetAddress.get(),
+                            gt7HeartbeatPort
+                        )
                         socket?.send(packetHeartbeat)
-                        Log.d("GT7Parser", "Heartbeat sent to GT7 (Port $gt7HeartbeatPort)...")
+                        Log.d(
+                            "GT7Parser",
+                            "Heartbeat sent to ${currentTargetAddress.get().hostAddress}:$gt7HeartbeatPort..."
+                        )
                     } catch (e: Exception) {
                         Log.e("GT7Parser", "Heartbeat error: ${e.message}")
                     }
-                    delay(9000)
+
+                    val currentDelay =
+                        if (currentTargetAddress.get().hostAddress == "255.255.255.255") 1000L else 9000L
+                    delay(currentDelay.milliseconds)
                 }
             }
 
@@ -95,30 +92,37 @@ class GT7Parser {
 
             while (isRunning) {
                 try {
+                    incomingPacket.length = receiveBuffer.size
+
                     socket?.receive(incomingPacket)
 
                     val packetLength = incomingPacket.length
-                    Log.d("GT7Parser", "Received packet! Size: $packetLength bytes")
 
                     if (packetLength > 0) {
                         val packetData = incomingPacket.data.copyOf(packetLength)
-
                         val decryptedData = decrypt.decryptGT7Packet(packetData)
 
                         if (decryptedData != null && decryptedData.size >= 368) {
                             val timeStamp = System.currentTimeMillis()
-
-                            val buffer = ByteBuffer.wrap(decryptedData).order(ByteOrder.LITTLE_ENDIAN)
+                            val buffer =
+                                ByteBuffer.wrap(decryptedData).order(ByteOrder.LITTLE_ENDIAN)
                             val magic = buffer.getInt(0)
 
                             if (magic == 0x47375330) {
 
+                                if (currentTargetAddress.get().hostAddress == "255.255.255.255") {
+                                    currentTargetAddress.set(incomingPacket.address)
+                                    Log.i(
+                                        "GT7Parser",
+                                        "✅ Auto-discovery successful! Locked onto PlayStation at ${currentTargetAddress.get().hostAddress}"
+                                    )
+                                }
+
                                 // getting current game state
                                 val flags = buffer.getShort(0x8E).toInt()
                                 val isCarOnTrack = (flags and 1) != 0
-                                val isPaused     = (flags and 2) != 0
-                                val isLoading    = (flags and 4) != 0
-                                // val isInGear     = (flags and 8) != 0
+                                val isPaused = (flags and 2) != 0
+                                val isLoading = (flags and 4) != 0
                                 val isRaceActive = isCarOnTrack && !isPaused && !isLoading
 
                                 // calibrate maxRpm and checking if car was changed
@@ -146,7 +150,8 @@ class GT7Parser {
                                 // preparing ABS data
                                 val brakePhysical = buffer.get(0x92).toInt() and 0xFF
                                 val brakeActuated = buffer.get(0x13D).toInt() and 0xFF
-                                val isAbsInAction = (brakePhysical > 10) && ((brakePhysical - brakeActuated) > 10)
+                                val isAbsInAction =
+                                    (brakePhysical > 10) && ((brakePhysical - brakeActuated) > 10)
 
                                 // preparing TC data
                                 val throttleFiltered = buffer.get(0x91).toInt() and 0xFF
@@ -179,9 +184,12 @@ class GT7Parser {
                                         param,
                                         timeStamp
                                     )
+                                } else {
+                                    sendFallbackData()
                                 }
                             } else {
                                 Log.w("GT7Parser", "Decrypted, but invalid magic signature: $magic")
+                                sendFallbackData()
                             }
                         }
                     }
@@ -189,14 +197,15 @@ class GT7Parser {
                     sendFallbackData()
                 } catch (e: Exception) {
                     Log.e("GT7Parser", "Receive error: ${e.message}")
-                    delay(100)
+                    delay(100.milliseconds)
+                    sendFallbackData()
                 }
             }
-
             handshakeJob.cancel()
 
         } catch (e: Exception) {
             Log.e("GT7Parser", "Critical error: ${e.message}")
+            sendFallbackData()
         } finally {
             sendFallbackData()
             closeSocket()

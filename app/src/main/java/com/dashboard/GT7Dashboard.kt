@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,23 +34,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-class RallyDashboard {
+class GT7Dashboard {
     @Composable
     fun DashboardScreen(viewModel: DashboardViewModel) {
         val maxRpm = viewModel.maxRpmState.floatValue
         val rpmValue = viewModel.rpmState.floatValue
         val currentSpeed = viewModel.speedState.floatValue
+        val absState = viewModel.absState.value
+        val tcState = viewModel.tcState.value
         val currentGear = viewModel.gearState.value
-        val currentTime = viewModel.time0State.intValue
-        val engineTemp = viewModel.paramState.intValue
+        val currentLapTime = viewModel.time0State.intValue
+        val lastLapTime = viewModel.time1State.intValue
+        val bestLapTime = viewModel.time2State.intValue
 
-        val minRpmLights = maxRpm * 0.80f
+        val minRpmLights = maxRpm * 0.85f
         val shiftPoint = maxRpm * 0.9f
         val warningPoint = maxRpm * 0.95f
         val isWarningLightActive = rpmValue >= warningPoint
         val isShiftLightActive = rpmValue >= shiftPoint
         val infiniteTransition = rememberInfiniteTransition(label = "BlinkerTransition")
-
 
         val blinkAlpha by infiniteTransition.animateFloat(
             initialValue = 0f,
@@ -94,6 +97,24 @@ class RallyDashboard {
             val seconds = totalSeconds % 60
             val minutes = totalSeconds / 60
             return String.format("%d:%02d:%03d", minutes, seconds, milliseconds)
+        }
+
+        @Composable
+        fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isActive) activeColor else Color(0xFF2C2C2C))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = text,
+                    color = if (isActive) Color.Black else Color(0xFF555555),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
         }
 
         Box(
@@ -150,6 +171,18 @@ class RallyDashboard {
                         verticalArrangement = Arrangement.SpaceEvenly,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            IndicatorLight(
+                                text = "ABS",
+                                isActive = absState,
+                                activeColor = Color.Cyan
+                            )
+                            IndicatorLight(
+                                text = "TC",
+                                isActive = tcState,
+                                activeColor = Color.Yellow
+                            )
+                        }
                         Text(
                             text = "${currentSpeed.toInt()}",
                             color = Color.White,
@@ -190,7 +223,7 @@ class RallyDashboard {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = formatTime(currentTime.toLong()),
+                            text = formatTime(currentLapTime.toLong()),
                             color = Color.White,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Bold,
@@ -198,11 +231,19 @@ class RallyDashboard {
                             modifier = Modifier.height(44.dp)
                         )
                         Text(
-                            text = "Oil temp: ${engineTemp}\u00B0C",
-                            color = if (engineTemp > 100) Color(0xFFFF0000) else if (engineTemp > 89) Color(
-                                0xFF9BC902
-                            ) else Color(0xFFCFCFCF),
-                            fontSize = if (engineTemp > 105) 28.sp else 24.sp,
+                            text = formatTime(lastLapTime.toLong()),
+                            color = if (lastLapTime == bestLapTime) Color.Green else Color(
+                                0xFFB83A1D
+                            ),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.SansSerif,
+                            modifier = Modifier.height(40.dp)
+                        )
+                        Text(
+                            text = formatTime(bestLapTime.toLong()),
+                            color = Color(0xFF7405A3),
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
                             modifier = Modifier.height(40.dp)

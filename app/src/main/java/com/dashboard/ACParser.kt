@@ -11,6 +11,7 @@ import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.time.Duration.Companion.milliseconds
 
 class ACParser {
 
@@ -19,6 +20,7 @@ class ACParser {
 
     suspend fun connectToAssettoCorsa(
         pcIpAddress: String,
+        pcPort: String,
         onDataReceived: (
             speed: Float,
             rpm: Float,
@@ -34,7 +36,6 @@ class ACParser {
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
-        val acPort = 9996
         isRunning = true
 
         val sendFallbackData = {
@@ -68,19 +69,29 @@ class ACParser {
                     putInt(1).putInt(1).putInt(1)
                 }
 
-                val packetConnect = DatagramPacket(bufferConnect.array(), bufferConnect.capacity(), pcAddress, acPort)
-                val packetUpdate = DatagramPacket(bufferUpdate.array(), bufferUpdate.capacity(), pcAddress, acPort)
+                val packetConnect = DatagramPacket(
+                    bufferConnect.array(),
+                    bufferConnect.capacity(),
+                    pcAddress,
+                    pcPort.toInt()
+                )
+                val packetUpdate = DatagramPacket(
+                    bufferUpdate.array(),
+                    bufferUpdate.capacity(),
+                    pcAddress,
+                    pcPort.toInt()
+                )
 
                 while (isRunning) {
                     try {
                         socket?.send(packetConnect)
-                        delay(50)
+                        delay(50.milliseconds)
                         socket?.send(packetUpdate)
-                        Log.d("ACParser", "Handshake packets sent to AC...")
+                        Log.d("ACParser", "Handshake packets sent to AC ($pcAddress, $pcPort) ...")
                     } catch (e: Exception) {
                         Log.e("ACParser", "Handshake error: ${e.message}")
                     }
-                    delay(1000)
+                    delay(1000.milliseconds)
                 }
             }
 
@@ -91,6 +102,7 @@ class ACParser {
 
             while (isRunning) {
                 try {
+                    incomingPacket.length = receiveBuffer.size
                     socket?.receive(incomingPacket)
 
                     if (incomingPacket.length == 328) {
@@ -136,13 +148,19 @@ class ACParser {
                             param,
                             timeStamp
                         )
+                    } else {
+                        Log.d(
+                            "ACParser",
+                            "Received packet of size: ${incomingPacket.length}. Expected 328."
+                        )
                     }
                 } catch (_: SocketTimeoutException) {
+                    Log.d("ACParser", "Socket timeout: No data received from AC.")
                     maxRpm = 4000f
                     sendFallbackData()
                 } catch (e: Exception) {
                     Log.e("ACParser", "Receive error: ${e.message}")
-                    delay(100)
+                    delay(100.milliseconds)
                 }
             }
 

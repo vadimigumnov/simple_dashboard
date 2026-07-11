@@ -10,6 +10,7 @@ import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.absoluteValue
+import kotlin.time.Duration.Companion.milliseconds
 
 class RBRParser {
 
@@ -18,6 +19,7 @@ class RBRParser {
 
     suspend fun connectToRBR(
         pcIpAddress: String,
+        pcPort: String,
         onDataReceived: (
             speed: Float,
             rpm: Float,
@@ -33,7 +35,6 @@ class RBRParser {
         ) -> Unit
     ) = withContext(Dispatchers.IO) {
 
-        val rbrPort = 6776
         isRunning = true
 
         val sendFallbackData = {
@@ -52,7 +53,7 @@ class RBRParser {
             )
         }
         try {
-            socket = DatagramSocket(rbrPort)
+            socket = DatagramSocket(pcPort.toInt())
             socket?.soTimeout = 1500
 
             val receiveBuffer = ByteArray(664)
@@ -60,8 +61,11 @@ class RBRParser {
 
             var maxRpm = 4000f
 
+            Log.d("RBRParser", "UDP Server started. Listening on port $pcPort...")
+
             while (isRunning) {
                 try {
+                    incomingPacket.length = receiveBuffer.size
                     socket?.receive(incomingPacket)
 
                     if (incomingPacket.length == 664) {
@@ -82,7 +86,7 @@ class RBRParser {
                         val time0 = (buffer.getFloat(12) * 1000).toInt()
                         val time1 = -1
                         val time2 = -1
-                        val param = (buffer.getFloat(148)-273.15f).toInt() //engine temperature
+                        val param = (buffer.getFloat(148) - 273.15f).toInt() //engine temperature
 
                         val gearDisplay = when (rawGear) {
                             0 -> "R"
@@ -106,17 +110,27 @@ class RBRParser {
                             param,
                             timeStamp
                         )
+                    } else {
+                        Log.d(
+                            "RBRParser",
+                            "Received packet of unexpected size: ${incomingPacket.length}"
+                        )
                     }
                 } catch (_: SocketTimeoutException) {
+                    Log.d(
+                        "RBRParser",
+                        "Socket timeout: No data from RBR. Check if you are on the stage and phone IP is set in RSF Launcher."
+                    )
                     maxRpm = 4000f
                     sendFallbackData()
                 } catch (e: Exception) {
                     Log.e("RBRParser", "Receive error: ${e.message}")
-                    delay(100)
+                    delay(200.milliseconds)
                 }
             }
         } catch (e: Exception) {
             Log.e("RBRParser", "Critical error: ${e.message}")
+            sendFallbackData()
         } finally {
             sendFallbackData()
             closeSocket()
