@@ -57,7 +57,7 @@ fun WaitingForDataScreen(onBackToMenu: () -> Unit) {
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
+                .padding(48.dp)
         ) {
             Text(text = "Back", color = Color.White, fontWeight = FontWeight.Bold)
         }

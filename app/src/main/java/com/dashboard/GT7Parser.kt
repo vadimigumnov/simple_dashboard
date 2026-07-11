@@ -32,8 +32,10 @@ class GT7Parser {
         val gt7HeartbeatPort = 33739
         val gt7ReceivePort = 33740
 
+        var lastLapCount = -1
         var lastLapTimeLast = 0
-        var currentLapStartTime = 0
+        var currentLapTime = 0L
+        var lastPacketReceivedTime = System.currentTimeMillis()
 
         isRunning = true
 
@@ -159,15 +161,34 @@ class GT7Parser {
                                 val isTcInAction = (throttlePhysical - throttleFiltered) > 5
 
                                 // preparing laptimes
+                                val currentTimeLocal = System.currentTimeMillis()
+                                val deltaTime = currentTimeLocal - lastPacketReceivedTime
+                                lastPacketReceivedTime = currentTimeLocal
+                                val currentLapCount = buffer.getShort(0x74).toInt()
+
                                 val time2 = buffer.getInt(0x78)
                                 val time1 = buffer.getInt(0x7C)
-                                val currentTotalTime = buffer.getInt(0x80)
-                                if (time1 != lastLapTimeLast) {
+                                // val timeOfDayProgression = buffer.getInt(0x80)
+                                if (currentLapCount != lastLapCount || time1 != lastLapTimeLast) {
+                                    lastLapCount = currentLapCount
                                     lastLapTimeLast = time1
-                                    currentLapStartTime = currentTotalTime
+                                    currentLapTime = 0L
                                 }
-                                val time0 = currentTotalTime - currentLapStartTime
+
+                                if (isRaceActive) {
+                                    val safeDelta = if (deltaTime in 1..1000) deltaTime else 0L
+
+                                    val isWaitingForGreenLight =
+                                        (currentLapCount == 1 && time1 == -1 && finalSpeed < 1f)
+
+                                    if (!isWaitingForGreenLight) {
+                                        currentLapTime += safeDelta
+                                    }
+                                }
+                                val time0 = if (currentLapCount == 0) -1 else currentLapTime.toInt()
                                 val param = -1
+
+                                Log.d("GT7Parser", "currentLapTime(time0) = $time0 , lastLapTime(time1) = $time1, bestLapTime(time2) = $time2")
 
                                 // sending prepared data
                                 if (isRaceActive) {

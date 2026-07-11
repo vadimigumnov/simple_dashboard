@@ -111,15 +111,6 @@ class SimpleDashboard {
                 else -> Color(0xFF2C2C2C)
             }
 
-            @SuppressLint("DefaultLocale")
-            fun formatTime(timeInMillis: Long): String {
-                val milliseconds = timeInMillis % 1000
-                val totalSeconds = timeInMillis / 1000
-                val seconds = totalSeconds % 60
-                val minutes = totalSeconds / 60
-                return String.format("%d:%02d:%03d", minutes, seconds, milliseconds)
-            }
-
             @Composable
             fun IndicatorLight(text: String, isActive: Boolean, activeColor: Color) {
                 Box(

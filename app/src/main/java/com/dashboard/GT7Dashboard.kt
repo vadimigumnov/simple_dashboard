@@ -1,6 +1,5 @@
 package com.dashboard
 
-import android.annotation.SuppressLint
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -88,15 +87,6 @@ class GT7Dashboard {
         val bgColor = when {
             isWarningLightActive -> Color(0xFFFF0000).copy(alpha = blinkAlpha)
             else -> Color(0xFF2C2C2C)
-        }
-
-        @SuppressLint("DefaultLocale")
-        fun formatTime(timeInMillis: Long): String {
-            val milliseconds = timeInMillis % 1000
-            val totalSeconds = timeInMillis / 1000
-            val seconds = totalSeconds % 60
-            val minutes = totalSeconds / 60
-            return String.format("%d:%02d:%03d", minutes, seconds, milliseconds)
         }
 
         @Composable
